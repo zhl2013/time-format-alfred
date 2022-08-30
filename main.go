@@ -13,10 +13,11 @@ import (
 )
 
 var (
-	paramTime string
-	paramLoc  = "Local"
-	help      bool
-	icon      = model.Icon{
+	paramTime     string
+	formatPattern string
+	paramLoc      = "Local"
+	help          bool
+	icon          = model.Icon{
 		Path: "./icon.png",
 	}
 	resultItems = model.Items{
@@ -27,6 +28,7 @@ var (
 
 func init() {
 	flag.StringVar(&paramTime, "time", "", "时间信息，支持多种格式")
+	flag.StringVar(&formatPattern, "format", "", "时间格式")
 	flag.BoolVar(&help, "h", false, "this help")
 }
 
@@ -63,9 +65,34 @@ func main() {
 		return
 	}
 
+	formatTimestampPattern(result.UnixNano(), formatPattern)
+
 	zoneArgs := []string{time.Local.String()}
 	zoneArgs = append(zoneArgs, flag.Args()...)
 	formatTimestamp(result.UnixNano(), zoneArgs)
+}
+
+func formatTimestampPattern(timeNano int64, formatPattern string) {
+	defer func() {
+		if p := recover(); p != nil {
+			formatError(fmt.Errorf("defer %+v", p))
+		}
+	}()
+	patterns := strings.Split(formatPattern, ",")
+	unix := time.Unix(convertSecond(timeNano), timeNano%1000000)
+	for _, v := range patterns {
+		dt := dateparse.FormatDate(unix, dateparse.DateStyle(v))
+		if dt != "" {
+			result := dt
+			item := model.Item{
+				Uid:      "1",
+				Title:    v,
+				Subtitle: result,
+				Arg:      result,
+			}
+			resultItems.Items = append(resultItems.Items, item)
+		}
+	}
 }
 
 // 错误信息输出
